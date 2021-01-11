@@ -1,5 +1,5 @@
 ---
-title: "gisdraft"
+title: "GISProject"
 output: html_document
 ---
 
@@ -28,13 +28,13 @@ library(GGally)
 
 ## R Markdown
 
-get data
-
+get the obesity data from the data folder
 ```{r preparedata}
 rawData <- read_csv("data/EnglandObesity.csv", 
                                na = c("", "NA", "n/a"),
                                col_names = TRUE, 
                                locale = locale(encoding = 'Latin1'))
+
 # rawData <- rawData %>%clean_names()
 ```
 
@@ -43,7 +43,7 @@ draw the pair plots to have a look at the distribution and roughly relationships
 ggpairs(select(rawData,c(3:10)))
 ```
 
-draw the box plot to see the range, average and other information of the data
+draw the box plot to see the range, average and other information of the data 
 ```{r box-plot}
 par(mfrow=c(1,2))
 boxplot(select(rawData,c(3,7:9)))
@@ -51,7 +51,7 @@ boxplot(select(rawData,c(4:6,10)))
 
 ```
 
-For the skewed-distribution attribute, use Tukey's ladder to see how to transform it to be more like a normal distribution
+For the skewed-distribution attribute, use Tukey's ladder to see how to transform them to be more like normal distributions
 ```{r Tukey’s_ladder}
 symbox(~ALCOHOL, 
        rawData, 
@@ -59,15 +59,11 @@ symbox(~ALCOHOL,
        powers=seq(-3,3,by=.5))
 
 ```
+
 Check the distribution of the transformed data by histogram 
 ```{r Assumption1 distribution_variables}
 ggplot(rawData, aes(x=(ALCOHOL)^(-1))) +
   geom_histogram()
-  # geom_histogram(aes(y = ..density..),
-  #                binwidth = 0.1) +
-  # geom_density(colour="red",
-  #              size=1,
-  #              adjust=1)
 ```
 
 use the transformed data to build the linear model. Get the information of the model coefficients and the model itself
@@ -92,15 +88,9 @@ OLSModel <- lm(OBESE ~ SMOK +
 tidy(OLSModel)
 glance(OLSModel)
 summary(OLSModel)
-# predict <- tukeyData %>% tidypredict_to_column(OLSModel)
-# model_data <- OLSModel %>% augment(., tukeyData)
-# add residuals to the data
-# tukeyData <- tukeyData %>%
-#   mutate(OLSModelresids = residuals(OLSModel))
-# step(OLSModel, direction = "both")
 ```
 
-use VIF and correlation matrix to see whether there is multicolinearity among the attributes, remove the attribute whose VIF is higher than 10 or has correlation index larger than o.8
+use VIF and correlation matrix to see whether there is multicolinearity among the attributes, remove the attribute whose VIF is higher than 10 or has correlation index larger than 0.8
 ```{r Assumption3 Multicolinearity}
 # Variance Inflation Factor 
 vif(OLSModel)
@@ -131,15 +121,12 @@ OLSModel <- lm(OBESE ~
                  ALCOHOL + 
                  PHY_ACT +
                  # EMPLOY +
-                 # UNEMPLOY +
+                 UNEMPLOY +
                  ECO_INACT, 
-                 # DAY5,
+                 DAY5,
                data = tukeyData)
 tidy(OLSModel)
 glance(OLSModel)
-
-SSE1 = sum(summary(OLSModel)$residuals^2)
-cp1 = SSE1/s2 - (150-2*5)
 # vif(OLSModel)
 # BIC
 step(step(OLSModel, direction = "both"), direction = "both", k=log(nrow(tukeyData)))
@@ -149,6 +136,20 @@ step(OLSModel, direction = "both")
 
 and using cp and p-value we find the final model as follow
 ```{r adjustMode2}
+SSE1 = sum(summary(OLSModel)$residuals^2)
+cp1 = SSE1/s2 - (150-2*5)
+OLSModel <- lm(OBESE ~ 
+                 SMOK +
+                 ALCOHOL + 
+                 PHY_ACT +
+                 # EMPLOY +
+                 # UNEMPLOY +
+                 ECO_INACT,
+                 # DAY5, 
+               data = tukeyData)
+
+SSE1 = sum(summary(OLSModel)$residuals^2)
+cp1 = SSE1/s2 - (150-2*5)
 OLSModel <- lm(OBESE ~ 
                  # SMOK + 
                  ALCOHOL + 
@@ -158,15 +159,9 @@ OLSModel <- lm(OBESE ~
                  ECO_INACT,
                  # DAY5, 
                data = tukeyData)
-tidy(OLSModel)
-glance(OLSModel)
 SSE2 = sum(summary(OLSModel)$residuals^2)
 cp2 = SSE2/s2 - (150-2*4)
-print(cp1 < cp2)
-# BIC
-step(step(OLSModel, direction = "both"), direction = "both", k=log(nrow(tukeyData)))
-# AIC
-step(OLSModel, direction = "both")
+# choose the model that its cp is closer to p than other models. As there is no lack of fit when the value of cp is approximately p.
 ```
 
 check whether the residuals in the model is normally distributed
@@ -206,6 +201,7 @@ geometryData <- England%>%
 
 
 # qtm(geometryData)
+# drqw the distribution of obese on the map
 tmap_mode("plot")
 tm1 <- tm_shape(geometryData) + 
   tm_polygons("OBESE",palette="RdBu",breaks=c(10,22,25,28,35))+
@@ -220,7 +216,7 @@ legend <- tm_shape(geometryData) +
 t=tmap_arrange(tm1,legend)
 t
 
-
+# draw the distribution of other attributes on the map
 tmap_mode("plot")
 tm1 <- tm_shape(geometryData) + 
   tm_polygons("ALCOHOL",palette="RdBu", breaks=c(3.6, 3.9, 4.1, 4.3, 5.0))+
@@ -246,6 +242,7 @@ t=tmap_arrange(tm1,tm2,tm3,legend, nrow=2)
 t
 
 ```
+
 
 
 calculate the Moran’s I statistic for both Queen’s case neighbours and k-nearest neighbours of 4
@@ -292,6 +289,7 @@ Nearest_neighbour
 #Remembering that Moran’s I ranges from between -1 and +1 (0 indicating no spatial autocorrelation) we can conclude that there is some moderate spatial autocorrelation in our residuals.
 ```
 
+
 construct the GWR model use the attributes we select by MLR
 ```{r GWR}
 st_crs(geometryData) = 27700
@@ -334,6 +332,7 @@ gwrResults <- as.data.frame(gwr.model$SDF)
 names(gwrResults)
 ```
 
+
 show the distribution of the coefficients on the map
 ```{r show_results}
 #attach coefficients to original SF
@@ -347,11 +346,12 @@ geometryDataSP2 <- geometryData %>%
          # coef_alcohol_related_admissions = gwrResults$ALCOHOL,
          # coef_ilo_economically_inactive = gwrResults$ECO_INACT)
 
+# the coefficients of three attributes
 tmap_mode("plot")
 tm1 <- tm_shape(geometryDataSP2) + 
   tm_polygons("coef_ALCOHOL",palette="RdBu",midpoint = 0)+
   # tm_legend()+
-  tm_layout(frame=FALSE,bg.color = "transparent",legend.position=c(0.1,0.4)) +
+  tm_layout(frame=FALSE,bg.color = "transparent",legend.position=c(0.1,0.52)) +
   tm_credits("(a)", position=c(0.65,0.85), size=1.5)
 tm2 <- tm_shape(geometryDataSP2) + 
   tm_polygons("coef_PHY_ACT",palette="RdBu",midpoint = 0)+
@@ -361,7 +361,7 @@ tm2 <- tm_shape(geometryDataSP2) +
 tm3 <- tm_shape(geometryDataSP2) + 
   tm_polygons("coef_ECO_INACT",palette="RdBu",midpoint = 0)+
   # tm_legend(show=FALSE)+
-  tm_layout(frame=FALSE,bg.color = "transparent",legend.position=c(0.1,0.5)) +
+  tm_layout(frame=FALSE,bg.color = "transparent",legend.position=c(0.1,0.32)) +
   tm_credits("(c)", position=c(0.65,0.85), size=1.5)
 legend <- tm_shape(geometryDataSP2) + 
   tm_polygons("coef_ECO_INACT",palette="RdBu",midpoint = 0)+
@@ -377,6 +377,8 @@ t
 #               alpha = 0.5,
 #               midpoint = NA)
 ```
+
+
 to see whether the coefficient estimate is more than 2 standard errors away from zero
 ```{r check_statistically_significant}
 #run the significance test
@@ -390,6 +392,7 @@ geometryDataSP2 <- geometryDataSP2 %>%
          ALCOHOLSigTest = ALCOHOLSigTest,
          ECO_INACTSigTest = ECO_INACTSigTest)
 
+# the value bigger than zero is statistically significiant
 tmap_mode("plot")
 tm1 <- tm_shape(geometryDataSP2) + 
   tm_polygons("ALCOHOLSigTest",palette="RdBu",midpoint = 0)+
@@ -414,6 +417,8 @@ legend <- tm_shape(geometryDataSP2) +
 t=tmap_arrange(tm1,tm2,tm3,legend, nrow=2)
 t
 ```
+
+
 have a look at the local R2 of the model
 ```{r check_local_R2}
 tmap_mode("plot")
